@@ -1,0 +1,1235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Secure Media Vault Pro</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        :root {
+            --primary: #10b981;
+            --primary-dark: #059669;
+            --dark: #1e293b;
+            --darker: #0f172a;
+            --calc-bg: #1a202c;
+            --error: #ef4444;
+            --warning: #f59e0b;
+            --success: #10b981;
+            --glass: rgba(30, 41, 59, 0.5);
+            --glass-border: rgba(255, 255, 255, 0.1);
+            --glow: 0 0 15px rgba(16, 185, 129, 0.4);
+        }
+        
+        body {
+            background: linear-gradient(135deg, var(--darker), var(--dark));
+            min-height: 100vh;
+            color: #e2e8f0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        
+        .container {
+            width: 100%;
+            max-width: 500px;
+            background: var(--glass);
+            border-radius: 20px;
+            overflow: hidden;
+            box-shadow: 0 15px 30px rgba(0, 0, 0, 0.4);
+            position: relative;
+            border: 1px solid var(--glass-border);
+            backdrop-filter: blur(10px);
+        }
+        
+        .header {
+            background: linear-gradient(90deg, var(--primary), var(--primary-dark));
+            padding: 20px;
+            text-align: center;
+            position: relative;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .header h1 {
+            font-size: 1.8rem;
+            font-weight: 700;
+            margin-bottom: 5px;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+        }
+        
+        .header p {
+            font-size: 0.9rem;
+            opacity: 0.9;
+        }
+        
+        .security-status {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            background: rgba(0, 0, 0, 0.3);
+            padding: 5px 10px;
+            border-radius: 15px;
+            font-size: 0.8rem;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        .security-level {
+            display: flex;
+            gap: 2px;
+        }
+        
+        .security-level div {
+            width: 5px;
+            height: 10px;
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 2px;
+        }
+        
+        .security-level div.active {
+            background: #4ade80;
+        }
+        
+        .display {
+            background: rgba(13, 20, 31, 0.8);
+            padding: 20px;
+            text-align: right;
+            font-size: 2.5rem;
+            font-weight: 300;
+            font-family: 'Courier New', monospace;
+            border-bottom: 2px solid rgba(255, 255, 255, 0.05);
+            min-height: 100px;
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            letter-spacing: 2px;
+            text-shadow: 0 0 8px rgba(16, 185, 129, 0.5);
+        }
+        
+        .keypad {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+            padding: 20px;
+        }
+        
+        .btn {
+            background: rgba(45, 55, 72, 0.8);
+            border: none;
+            color: white;
+            padding: 18px 10px;
+            border-radius: 12px;
+            font-size: 1.4rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        
+        .btn:hover {
+            background: rgba(55, 65, 82, 0.9);
+            transform: translateY(-2px);
+        }
+        
+        .btn:active {
+            transform: translateY(1px);
+        }
+        
+        .btn.operator {
+            background: rgba(14, 165, 233, 0.8);
+        }
+        
+        .btn.clear {
+            background: rgba(239, 68, 68, 0.8);
+        }
+        
+        .btn.equals {
+            background: rgba(16, 185, 129, 0.9);
+            grid-column: span 2;
+        }
+        
+        .btn.equals:hover {
+            background: rgba(5, 150, 105, 0.9);
+            box-shadow: var(--glow);
+        }
+        
+        .vault-container {
+            display: none;
+            padding: 20px;
+        }
+        
+        .vault-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid var(--glass-border);
+        }
+        
+        .vault-header h2 {
+            font-size: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .logout-btn {
+            background: rgba(239, 68, 68, 0.2);
+            border: none;
+            color: #ef4444;
+            padding: 8px 15px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        .logout-btn:hover {
+            background: rgba(239, 68, 68, 0.3);
+        }
+        
+        .input-group {
+            margin-bottom: 15px;
+        }
+        
+        .input-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-size: 0.9rem;
+            opacity: 0.8;
+        }
+        
+        .input-group input {
+            width: 100%;
+            padding: 14px;
+            border-radius: 12px;
+            border: none;
+            background: rgba(30, 41, 59, 0.7);
+            color: white;
+            font-size: 1rem;
+            border: 1px solid var(--glass-border);
+        }
+        
+        .input-group input:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.3);
+        }
+        
+        .add-btn {
+            width: 100%;
+            padding: 15px;
+            background: var(--primary);
+            border: none;
+            border-radius: 12px;
+            color: white;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-top: 10px;
+            gap: 10px;
+        }
+        
+        .add-btn:hover {
+            background: var(--primary-dark);
+            transform: translateY(-2px);
+        }
+        
+        .links-container {
+            margin-top: 25px;
+        }
+        
+        .links-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        
+        .links-header h3 {
+            font-size: 1.2rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .file-count {
+            background: rgba(16, 185, 129, 0.2);
+            color: var(--primary);
+            padding: 3px 10px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+        }
+        
+        .links-list {
+            background: rgba(30, 41, 59, 0.5);
+            border-radius: 15px;
+            padding: 15px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        
+        .no-links {
+            text-align: center;
+            padding: 40px 20px;
+            opacity: 0.6;
+        }
+        
+        .no-links i {
+            font-size: 3rem;
+            margin-bottom: 15px;
+            color: rgba(255, 255, 255, 0.3);
+        }
+        
+        .link-item {
+            background: rgba(30, 41, 59, 0.7);
+            border-radius: 12px;
+            padding: 15px;
+            margin-bottom: 12px;
+            transition: all 0.3s;
+            border: 1px solid var(--glass-border);
+            position: relative;
+        }
+        
+        .link-item:hover {
+            background: rgba(45, 55, 72, 0.7);
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+        }
+        
+        .link-type {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(0, 0, 0, 0.3);
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            opacity: 0.8;
+        }
+        
+        .link-title {
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: var(--primary);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .link-url {
+            font-size: 0.85rem;
+            opacity: 0.8;
+            word-break: break-all;
+            margin-bottom: 12px;
+            display: block;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        
+        .link-actions {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .action-btn {
+            flex: 1;
+            padding: 8px;
+            border-radius: 8px;
+            border: none;
+            font-size: 0.9rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+            gap: 5px;
+        }
+        
+        .preview-btn {
+            background: rgba(14, 165, 233, 0.2);
+            color: #0ea5e9;
+        }
+        
+        .preview-btn:hover {
+            background: rgba(14, 165, 233, 0.3);
+        }
+        
+        .delete-btn {
+            background: rgba(239, 68, 68, 0.2);
+            color: #ef4444;
+        }
+        
+        .delete-btn:hover {
+            background: rgba(239, 68, 68, 0.3);
+        }
+        
+        .notification {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            padding: 15px 25px;
+            border-radius: 10px;
+            color: white;
+            font-weight: 500;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+            display: flex;
+            align-items: center;
+            z-index: 1000;
+            transform: translateY(100px);
+            opacity: 0;
+            transition: all 0.3s ease;
+            gap: 10px;
+        }
+        
+        .notification.show {
+            transform: translateY(0);
+            opacity: 1;
+        }
+        
+        .notification.success {
+            background: var(--primary);
+        }
+        
+        .notification.error {
+            background: #ef4444;
+        }
+        
+        .instruction {
+            text-align: center;
+            padding: 15px;
+            font-size: 0.9rem;
+            opacity: 0.7;
+            border-top: 1px solid var(--glass-border);
+        }
+        
+        .secret-hint {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(0, 0, 0, 0.3);
+            color: rgba(255, 255, 255, 0.5);
+            padding: 3px 8px;
+            border-radius: 10px;
+            font-size: 0.7rem;
+        }
+        
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            z-index: 2000;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .modal-content {
+            background: var(--dark);
+            border-radius: 15px;
+            width: 90%;
+            max-width: 800px;
+            max-height: 90vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .modal-header {
+            padding: 15px 20px;
+            background: rgba(30, 41, 59, 0.9);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .modal-title {
+            font-size: 1.2rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .close-btn {
+            background: none;
+            border: none;
+            color: #94a3b8;
+            font-size: 1.5rem;
+            cursor: pointer;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .close-btn:hover {
+            background: rgba(239, 68, 68, 0.2);
+            color: #ef4444;
+        }
+        
+        .modal-body {
+            flex: 1;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .preview-container {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 20px;
+        }
+        
+        .preview-image {
+            max-width: 100%;
+            max-height: 60vh;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+        }
+        
+        .preview-video {
+            width: 100%;
+            max-height: 60vh;
+            border-radius: 10px;
+            background: #000;
+        }
+        
+        .preview-audio {
+            width: 100%;
+            max-width: 400px;
+        }
+        
+        .preview-iframe {
+            width: 100%;
+            height: 60vh;
+            border: none;
+            border-radius: 10px;
+        }
+        
+        .preview-placeholder {
+            text-align: center;
+            padding: 40px;
+            opacity: 0.6;
+        }
+        
+        .preview-placeholder i {
+            font-size: 3rem;
+            margin-bottom: 15px;
+            color: rgba(255, 255, 255, 0.3);
+        }
+        
+        .link-type-icon {
+            font-size: 0.9em;
+        }
+        
+        @media (max-width: 480px) {
+            .display {
+                font-size: 2rem;
+                padding: 15px;
+                min-height: 80px;
+            }
+            
+            .keypad {
+                padding: 15px;
+                gap: 8px;
+            }
+            
+            .btn {
+                padding: 15px 5px;
+                font-size: 1.2rem;
+            }
+            
+            .header h1 {
+                font-size: 1.5rem;
+            }
+            
+            .modal-body {
+                padding: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Calculator UI -->
+        <div id="calculator-ui">
+            <div class="header">
+                <div class="secret-hint">Secret: 456</div>
+                <h1><i class="fas fa-lock"></i> Secure Media Vault Pro</h1>
+                <p>Advanced security for your private media</p>
+                <div class="security-status">
+                    <i class="fas fa-shield-alt"></i>
+                    <span>Security Level:</span>
+                    <div class="security-level">
+                        <div class="active"></div>
+                        <div class="active"></div>
+                        <div class="active"></div>
+                        <div></div>
+                        <div></div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="display" id="display">0</div>
+            
+            <div class="keypad">
+                <button class="btn" data-value="7">7</button>
+                <button class="btn" data-value="8">8</button>
+                <button class="btn" data-value="9">9</button>
+                <button class="btn operator" data-value="/">÷</button>
+                
+                <button class="btn" data-value="4">4</button>
+                <button class="btn" data-value="5">5</button>
+                <button class="btn" data-value="6">6</button>
+                <button class="btn operator" data-value="*">×</button>
+                
+                <button class="btn" data-value="1">1</button>
+                <button class="btn" data-value="2">2</button>
+                <button class="btn" data-value="3">3</button>
+                <button class="btn operator" data-value="-">−</button>
+                
+                <button class="btn clear" data-value="C">C</button>
+                <button class="btn" data-value="0">0</button>
+                <button class="btn" data-value=".">.</button>
+                <button class="btn operator" data-value="+">+</button>
+                
+                <button class="btn equals" data-value="=">=</button>
+            </div>
+            
+            <div class="instruction">
+                <i class="fas fa-info-circle"></i>
+                After calculation, enter your secret code to unlock the vault
+            </div>
+        </div>
+        
+        <!-- Vault UI (Hidden until unlocked) -->
+        <div id="vault-ui" class="vault-container">
+            <div class="vault-header">
+                <h2><i class="fas fa-vault"></i> Media Vault</h2>
+                <button id="logout-btn" class="logout-btn">
+                    <i class="fas fa-sign-out-alt"></i> Logout
+                </button>
+            </div>
+            
+            <div class="input-group">
+                <label for="media-title"><i class="fas fa-heading"></i> Media Title</label>
+                <input type="text" id="media-title" placeholder="My private media">
+            </div>
+            
+            <div class="input-group">
+                <label for="media-url"><i class="fas fa-link"></i> Media URL</label>
+                <input type="text" id="media-url" placeholder="https://example.com/image.jpg">
+            </div>
+            
+            <button id="add-media-btn" class="add-btn">
+                <i class="fas fa-plus-circle"></i> Add to Vault
+            </button>
+            
+            <div class="links-container">
+                <div class="links-header">
+                    <h3><i class="fas fa-file-medial"></i> My Files</h3>
+                    <div class="file-count">
+                        <span id="file-count">0</span> files
+                    </div>
+                </div>
+                
+                <div class="links-list" id="links-list">
+                    <div class="no-links" id="no-links">
+                        <i class="fas fa-box-open"></i>
+                        <p>Your vault is empty</p>
+                        <p class="small">Add media to see it here</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="notification" id="notification">
+        <i class="fas fa-check-circle"></i>
+        <span>Media added successfully!</span>
+    </div>
+    
+    <div class="modal" id="preview-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-title">
+                    <i class="fas fa-eye"></i>
+                    <span id="modal-title">Preview</span>
+                </div>
+                <button class="close-btn" id="close-modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="preview-container" id="preview-container">
+                    <div class="preview-placeholder">
+                        <i class="fas fa-file-download"></i>
+                        <p>Loading preview...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Enhanced Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyDGDVsK8QjhyP99qL-jT4FINw4IEYUDDbM",
+            authDomain: "dexmartlk.firebaseapp.com",
+            databaseURL: "https://dexmartlk-default-rtdb.asia-southeast1.firebasedatabase.app",
+            projectId: "dexmartlk",
+            storageBucket: "dexmartlk.appspot.com",
+            messagingSenderId: "199837057399",
+            appId: "1:199837057399:web:0b05b0826dc081e9b6a172",
+            measurementId: "G-PK3EZ63ERR"
+        };
+        
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+        const auth = firebase.auth();
+        
+        // State variables
+        let currentInput = '0';
+        let previousInput = '';
+        let operator = '';
+        let resetDisplay = false;
+        let isUnlocked = false;
+        let secretCode = "456";
+        let vaultPassword = "Savin123";
+        let files = [];
+        let userId = null;
+        
+        // DOM elements
+        const display = document.getElementById('display');
+        const calculatorUI = document.getElementById('calculator-ui');
+        const vaultUI = document.getElementById('vault-ui');
+        const logoutBtn = document.getElementById('logout-btn');
+        const addMediaBtn = document.getElementById('add-media-btn');
+        const mediaTitle = document.getElementById('media-title');
+        const mediaUrl = document.getElementById('media-url');
+        const linksList = document.getElementById('links-list');
+        const noLinks = document.getElementById('no-links');
+        const fileCount = document.getElementById('file-count');
+        const notification = document.getElementById('notification');
+        const previewModal = document.getElementById('preview-modal');
+        const previewContainer = document.getElementById('preview-container');
+        const modalTitle = document.getElementById('modal-title');
+        const closeModal = document.getElementById('close-modal');
+        
+        // Update calculator display
+        function updateDisplay() {
+            display.textContent = currentInput;
+        }
+        
+        // Evaluate expression safely
+        function safeEval(expr) {
+            try {
+                // Enhanced security: only allow numbers and basic operators
+                if (!/^[0-9+\-*/.() ]*$/.test(expr)) return 'Error';
+                const result = eval(expr.replace(/×/g, '*').replace(/÷/g, '/'));
+                if (result === Infinity || result === -Infinity || isNaN(result)) return 'Error';
+                return result;
+            } catch {
+                return 'Error';
+            }
+        }
+        
+        // Show notification
+        function showNotification(message, isSuccess = true) {
+            notification.querySelector('span').textContent = message;
+            notification.className = 'notification ' + (isSuccess ? 'success' : 'error');
+            notification.querySelector('i').className = isSuccess ? 
+                'fas fa-check-circle' : 'fas fa-exclamation-circle';
+            
+            notification.classList.add('show');
+            
+            setTimeout(() => {
+                notification.classList.remove('show');
+            }, 3000);
+        }
+        
+        // Enhanced encryption with key derivation
+        function encryptData(text) {
+            // Use PBKDF2 to derive a key from the password
+            const salt = CryptoJS.lib.WordArray.random(128/8);
+            const key = CryptoJS.PBKDF2(vaultPassword, salt, {
+                keySize: 256/32,
+                iterations: 1000
+            });
+            
+            // Encrypt using AES
+            const encrypted = CryptoJS.AES.encrypt(text, key, { iv: salt });
+            
+            // Return salt + encrypted data
+            return salt.toString() + encrypted.toString();
+        }
+        
+        // Enhanced decryption
+        function decryptData(ciphertext) {
+            try {
+                // Extract salt (first 32 hex characters)
+                const salt = CryptoJS.enc.Hex.parse(ciphertext.substring(0, 32));
+                const encryptedData = ciphertext.substring(32);
+                
+                // Derive key
+                const key = CryptoJS.PBKDF2(vaultPassword, salt, {
+                    keySize: 256/32,
+                    iterations: 1000
+                });
+                
+                // Decrypt
+                const decrypted = CryptoJS.AES.decrypt(encryptedData, key, { iv: salt });
+                const result = decrypted.toString(CryptoJS.enc.Utf8);
+                
+                if (!result) {
+                    throw new Error("Decryption failed: empty result");
+                }
+                return result;
+            } catch (error) {
+                console.error("Decryption error:", error);
+                return "Decryption Error";
+            }
+        }
+        
+        // Detect media type from URL
+        function detectMediaType(url) {
+            url = url.toLowerCase();
+            
+            // YouTube detection
+            if (url.includes('youtube.com') || url.includes('youtu.be')) {
+                return { type: 'youtube', icon: 'fab fa-youtube', label: 'YouTube' };
+            }
+            
+            // Image detection
+            const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg'];
+            for (let ext of imageExtensions) {
+                if (url.includes(ext)) {
+                    return { type: 'image', icon: 'fas fa-image', label: 'Image' };
+                }
+            }
+            
+            // Video detection
+            const videoExtensions = ['.mp4', '.webm', '.mov', '.avi', '.mkv'];
+            for (let ext of videoExtensions) {
+                if (url.includes(ext)) {
+                    return { type: 'video', icon: 'fas fa-film', label: 'Video' };
+                }
+            }
+            
+            // Audio detection
+            const audioExtensions = ['.mp3', '.wav', '.ogg', '.m4a', '.flac'];
+            for (let ext of audioExtensions) {
+                if (url.includes(ext)) {
+                    return { type: 'audio', icon: 'fas fa-music', label: 'Audio' };
+                }
+            }
+            
+            // Default to generic
+            return { type: 'other', icon: 'fas fa-link', label: 'Link' };
+        }
+        
+        // Save media to Firestore
+        async function saveMediaToFirebase(title, url) {
+            try {
+                // Detect media type
+                const mediaType = detectMediaType(url);
+                
+                // Encrypt data before saving
+                const encryptedTitle = encryptData(title);
+                const encryptedUrl = encryptData(url);
+                const encryptedType = encryptData(mediaType.type);
+                
+                // Create a new document in the 'media' collection
+                await db.collection('media').add({
+                    userId: userId,
+                    title: encryptedTitle,
+                    url: encryptedUrl,
+                    type: encryptedType,
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                
+                showNotification('Media added to vault!');
+                return true;
+            } catch (error) {
+                console.error("Error saving media: ", error);
+                showNotification('Failed to save media: ' + error.message, false);
+                return false;
+            }
+        }
+        
+        // Load media from Firestore (with client-side sorting)
+        async function loadMediaFromFirebase() {
+            try {
+                const snapshot = await db.collection('media')
+                    .where('userId', '==', userId)
+                    .get();
+                
+                files = [];
+                
+                snapshot.forEach(doc => {
+                    const data = doc.data();
+                    // Decrypt data
+                    const decryptedTitle = decryptData(data.title);
+                    const decryptedUrl = decryptData(data.url);
+                    const decryptedType = decryptData(data.type);
+                    
+                    files.push({
+                        id: doc.id,
+                        title: decryptedTitle,
+                        url: decryptedUrl,
+                        type: decryptedType,
+                        createdAt: data.createdAt ? data.createdAt.toDate() : new Date()
+                    });
+                });
+                
+                // Client-side sorting by timestamp
+                files.sort((a, b) => b.createdAt - a.createdAt);
+                
+                renderFilesList();
+                return true;
+            } catch (error) {
+                console.error("Error loading media: ", error);
+                showNotification('Failed to load media: ' + error.message, false);
+                return false;
+            }
+        }
+        
+        // Delete media from Firestore
+        async function deleteMediaFromFirebase(id) {
+            try {
+                await db.collection('media').doc(id).delete();
+                showNotification('Media deleted successfully');
+                return true;
+            } catch (error) {
+                console.error("Error deleting media: ", error);
+                showNotification('Failed to delete media: ' + error.message, false);
+                return false;
+            }
+        }
+        
+        // Render files list
+        function renderFilesList() {
+            if (files.length === 0) {
+                noLinks.style.display = 'block';
+                linksList.innerHTML = '';
+                fileCount.textContent = '0';
+                return;
+            }
+            
+            noLinks.style.display = 'none';
+            fileCount.textContent = files.length;
+            
+            let html = '';
+            files.forEach(file => {
+                const mediaType = detectMediaType(file.url);
+                
+                html += `
+                    <div class="link-item" data-id="${file.id}">
+                        <div class="link-type">${mediaType.label}</div>
+                        <div class="link-title">
+                            <i class="${mediaType.icon}"></i>
+                            ${file.title}
+                        </div>
+                        <div class="link-url">${file.url}</div>
+                        <div class="link-actions">
+                            <button class="action-btn preview-btn" data-id="${file.id}">
+                                <i class="fas fa-eye"></i> Preview
+                            </button>
+                            <button class="action-btn delete-btn" data-id="${file.id}">
+                                <i class="fas fa-trash"></i> Delete
+                            </button>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            linksList.innerHTML = html;
+            
+            // Add event listeners to action buttons
+            document.querySelectorAll('.preview-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const id = btn.dataset.id;
+                    const file = files.find(f => f.id === id);
+                    if (file) {
+                        showPreview(file);
+                    }
+                });
+            });
+            
+            document.querySelectorAll('.delete-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const id = btn.dataset.id;
+                    if (confirm('Are you sure you want to delete this media?')) {
+                        deleteMediaFromFirebase(id).then(success => {
+                            if (success) {
+                                files = files.filter(f => f.id !== id);
+                                renderFilesList();
+                            }
+                        });
+                    }
+                });
+            });
+        }
+        
+        // Show preview of media
+        function showPreview(file) {
+            const mediaType = detectMediaType(file.url);
+            modalTitle.textContent = file.title;
+            previewModal.style.display = 'flex';
+            
+            // Clear previous preview
+            previewContainer.innerHTML = '';
+            
+            let previewElement;
+            
+            switch(mediaType.type) {
+                case 'image':
+                    previewElement = document.createElement('img');
+                    previewElement.src = file.url;
+                    previewElement.className = 'preview-image';
+                    previewElement.alt = file.title;
+                    break;
+                    
+                case 'video':
+                    previewElement = document.createElement('video');
+                    previewElement.src = file.url;
+                    previewElement.className = 'preview-video';
+                    previewElement.controls = true;
+                    previewElement.autoplay = true;
+                    break;
+                    
+                case 'youtube':
+                    // Extract YouTube video ID
+                    let videoId = null;
+                    if (file.url.includes('youtube.com/watch?v=')) {
+                        videoId = file.url.split('v=')[1].split('&')[0];
+                    } else if (file.url.includes('youtu.be/')) {
+                        videoId = file.url.split('youtu.be/')[1].split('?')[0];
+                    }
+                    
+                    if (videoId) {
+                        previewElement = document.createElement('iframe');
+                        previewElement.src = `https://www.youtube.com/embed/${videoId}?autoplay=1`;
+                        previewElement.className = 'preview-iframe';
+                        previewElement.allowFullscreen = true;
+                        previewElement.allow = "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture";
+                    } else {
+                        previewElement = document.createElement('div');
+                        previewElement.className = 'preview-placeholder';
+                        previewElement.innerHTML = `
+                            <i class="fas fa-exclamation-triangle"></i>
+                            <p>Invalid YouTube URL</p>
+                        `;
+                    }
+                    break;
+                    
+                case 'audio':
+                    previewElement = document.createElement('audio');
+                    previewElement.src = file.url;
+                    previewElement.className = 'preview-audio';
+                    previewElement.controls = true;
+                    previewElement.autoplay = true;
+                    break;
+                    
+                default:
+                    previewElement = document.createElement('iframe');
+                    previewElement.src = file.url;
+                    previewElement.className = 'preview-iframe';
+                    previewElement.sandbox = "allow-same-origin allow-scripts";
+            }
+            
+            previewContainer.appendChild(previewElement);
+        }
+        
+        // Sign in anonymously
+        auth.signInAnonymously()
+            .then(() => {
+                auth.onAuthStateChanged(user => {
+                    if (user) {
+                        userId = user.uid;
+                        console.log("User signed in anonymously with ID: ", userId);
+                    } else {
+                        console.log("User is signed out");
+                    }
+                });
+            })
+            .catch(error => {
+                console.error("Anonymous sign-in error: ", error);
+                showNotification('Failed to initialize security', false);
+            });
+        
+        // Initialize the calculator buttons
+        document.querySelectorAll('.btn').forEach(button => {
+            button.addEventListener('click', () => {
+                const value = button.dataset.value;
+                
+                if (value === 'C') {
+                    // Clear button
+                    currentInput = '0';
+                    previousInput = '';
+                    operator = '';
+                    resetDisplay = false;
+                } else if (value === '=') {
+                    // Equals button
+                    if (currentInput === secretCode) {
+                        // Unlock the vault
+                        isUnlocked = true;
+                        calculatorUI.style.display = 'none';
+                        vaultUI.style.display = 'block';
+                        loadMediaFromFirebase();
+                        showNotification('Vault unlocked!');
+                        return;
+                    }
+                    
+                    if (previousInput && operator && currentInput) {
+                        try {
+                            const expression = previousInput + operator.replace('×', '*').replace('÷', '/') + currentInput;
+                            const result = safeEval(expression);
+                            if (result === 'Error') {
+                                currentInput = 'Error';
+                            } else {
+                                currentInput = String(result);
+                            }
+                            previousInput = '';
+                            operator = '';
+                            resetDisplay = true;
+                        } catch {
+                            currentInput = 'Error';
+                        }
+                    }
+                } else if (['+', '-', '*', '/'].includes(value)) {
+                    // Operator buttons
+                    if (previousInput && operator && currentInput) {
+                        const expression = previousInput + operator.replace('×', '*').replace('÷', '/') + currentInput;
+                        const result = safeEval(expression);
+                        if (result !== 'Error') {
+                            previousInput = String(result);
+                            currentInput = '0';
+                        } else {
+                            currentInput = 'Error';
+                        }
+                    } else {
+                        previousInput = currentInput;
+                    }
+                    operator = value;
+                    resetDisplay = true;
+                } else {
+                    // Number and decimal buttons
+                    if (resetDisplay) {
+                        currentInput = value === '.' ? '0.' : value;
+                        resetDisplay = false;
+                    } else {
+                        if (currentInput === '0' && value !== '.') {
+                            currentInput = value;
+                        } else if (value === '.' && currentInput.includes('.')) {
+                            // Do nothing
+                        } else {
+                            currentInput += value;
+                        }
+                    }
+                }
+                
+                updateDisplay();
+            });
+        });
+        
+        // Logout button
+        logoutBtn.addEventListener('click', () => {
+            isUnlocked = false;
+            calculatorUI.style.display = 'block';
+            vaultUI.style.display = 'none';
+            currentInput = '0';
+            previousInput = '';
+            operator = '';
+            resetDisplay = false;
+            updateDisplay();
+            showNotification('Vault locked successfully');
+        });
+        
+        // Add media button
+        addMediaBtn.addEventListener('click', async () => {
+            const title = mediaTitle.value.trim();
+            const url = mediaUrl.value.trim();
+            
+            if (!title) {
+                showNotification('Please enter a title', false);
+                return;
+            }
+            
+            if (!url) {
+                showNotification('Please enter a URL', false);
+                return;
+            }
+            
+            // Validate URL format
+            try {
+                new URL(url);
+            } catch (e) {
+                showNotification('Please enter a valid URL', false);
+                return;
+            }
+            
+            // Add to Firebase
+            const success = await saveMediaToFirebase(title, url);
+            if (success) {
+                // Clear inputs
+                mediaTitle.value = '';
+                mediaUrl.value = '';
+                
+                // Reload media
+                loadMediaFromFirebase();
+            }
+        });
+        
+        // Close preview modal
+        closeModal.addEventListener('click', () => {
+            previewModal.style.display = 'none';
+        });
+        
+        // Close modal when clicking outside content
+        previewModal.addEventListener('click', (e) => {
+            if (e.target === previewModal) {
+                previewModal.style.display = 'none';
+            }
+        });
+        
+        // Initialize
+        updateDisplay();
+    </script>
+</body>
+</html>
